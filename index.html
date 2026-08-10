@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#6d4a86">
+  <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="quest-icon.svg" type="image/svg+xml"><link rel="stylesheet" href="app.css"><title>Today · Revision Cycle</title>
+</head>
+<body data-page="today">
+  <main class="app-shell">
+    <div class="topbar"><a class="brand" href="index.html"><span class="brand-mark">✦</span><span><strong>Revision Cycle</strong><small>made just for you</small></span></a><button class="hello-line hello-link" data-greeting data-action="checkin" type="button" title="A small check-in">Hey, what’s up?</button><div class="clock-box" aria-live="polite"><span class="sync-dot"></span><span><small>LIVE NOW</small><time id="liveClock">Loading time…</time></span></div></div>
+    <nav class="nav" aria-label="Main navigation"><a class="active" href="index.html"><span class="nav-icon">☀️</span>Today</a><a href="log.html"><span class="nav-icon">✍️</span>Add topic</a><a href="calendar.html"><span class="nav-icon">🗓️</span>Calendar</a><a href="insights.html"><span class="nav-icon">🧭</span>Review map</a><a href="quotes.html"><span class="nav-icon">✦</span>Quote garden</a><a href="setup.html"><span class="nav-icon">🔐</span>Setup</a></nav>
+    <section class="hero personal-hero"><div><p class="eyebrow">YOUR REVISION CYCLE</p><h1 id="todayGreeting">Hey, what’s up?</h1><p class="hero-sub" id="todaySubtitle">Your clear revision list—nothing extra to manage.</p><p class="checkin-doha hide" id="checkinDoha">तुलसी भरोसे राम के, निर्भय हो के सोए ।<br>अनहोनी होनी नहीं, होनी हो सो होए॥</p><div class="setup-hero-actions"><a class="button primary" href="log.html">✍️ Add a revision</a></div></div><div class="target-clock" data-countdown><div class="target-unit"><b data-time="days">—</b><span>DAYS</span></div><div class="target-unit"><b data-time="hours">—</b><span>HOURS</span></div><div class="target-unit"><b data-time="minutes">—</b><span>MIN</span></div><div class="target-unit"><b data-time="seconds">—</b><span>SEC</span></div><small class="target-caption">UNTIL IPMAT · 15 APR 2027</small></div></section>
+    <section class="quote-ribbon" aria-label="A rotating thought"><span class="quote-mark">“</span><div><blockquote data-quote-text>Loading a thought…</blockquote><cite data-quote-author></cite></div><button class="icon-button" type="button" data-action="next-quote" aria-label="Show another quote">↻</button></section>
+    <section class="cycle-board">
+      <section class="due-board" aria-label="Revision schedule">
+        <article class="due-lane overdue"><header class="lane-head"><b>⏰ Overdue</b><span id="overdueBadge">0 tasks</span></header><div class="lane-body" id="overdueLane"></div></article>
+        <article class="due-lane today"><header class="lane-head"><b>🎯 Due today</b><span id="todayBadge">0 tasks</span></header><div class="lane-body" id="todayLane"></div></article>
+        <article class="due-lane tomorrow"><header class="lane-head"><b>🌤️ Due tomorrow</b><span id="tomorrowBadge">0 tasks</span></header><div class="lane-body" id="tomorrowLane"></div></article>
+        <article class="due-lane week"><header class="lane-head"><b>🌿 Due this week</b><span id="weekBadge">0 tasks</span></header><div class="lane-body" id="weekLane"></div></article>
+      </section>
+      <aside class="tree-card"><div class="tree-head"><h2>🌳 Your consistency tree</h2><p>It grows from days you actually show up—not scores.</p></div><div class="tree-scene" id="treeScene"><div class="tree"><div class="tree-crown"><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="tree-fruit fruit-1"></i><i class="tree-fruit fruit-2"></i><i class="tree-fruit fruit-3"></i><i class="tree-fruit fruit-4"></i></div><div class="tree-trunk"></div></div><div class="tree-ground"></div></div><div class="tree-caption" id="treeCaption">Your tree grows when you return.</div></aside>
+    </section>
+    <footer class="footer"><span>Cycle: Study → 24h → Day 4 → Day 13</span><span id="lastChecked">Live check: —</span></footer>
+  </main><section class="checkin-popup hide" id="checkinPopup" role="dialog" aria-label="A small check-in"><button class="icon-button" data-action="close-checkin" type="button" aria-label="Close">×</button><h2>Kaise ho? Sab theekh?</h2><p>Take one small breath. You do not need to carry the whole day at once.</p><blockquote>तुलसी भरोसे राम के,<br>निर्भय हो के सोए ।<br>अनहोनी होनी नहीं,<br>होनी हो सो होए॥</blockquote></section><div class="toast" id="toast" role="status" aria-live="polite"></div><script src="app.js"></script>
+</body>
+</html>

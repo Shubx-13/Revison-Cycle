@@ -1,0 +1,10 @@
+{
+  "name": "IPMAT Study Quest",
+  "short_name": "Study Quest",
+  "description": "A calm, gamified IPMAT study dashboard.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#fffdf9",
+  "theme_color": "#6d4a86",
+  "icons": [{ "src": "quest-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
