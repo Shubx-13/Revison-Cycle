@@ -14,6 +14,6 @@
       <aside class="panel day-detail"><h2 id="selectedDayTitle">Your day</h2><p class="day-date" id="selectedDayDate">Loading…</p><div class="day-actions"><a class="button primary small" id="addTopicForDay" href="log.html">Add a topic</a></div><div id="dayMissions"></div><hr style="border:0;border-top:1px solid var(--line);margin:15px 0"><h2 style="font-size:.92rem">✍️ A note for this day</h2><form class="date-note-form" id="calendarNoteForm"><input id="calendarNoteId" type="hidden"><label for="calendarNoteText">Write anything: plan, thought, reminder…</label><textarea id="calendarNoteText" placeholder="Tomorrow: revise formulas before questions."></textarea><div class="form-actions"><button class="button orange small" id="saveDayNote" type="submit">Add note</button><button class="button ghost small hide" id="cancelDayNote" type="button">Cancel</button></div></form><div id="dayNotes"></div></aside>
     </section>
     <footer class="footer"><span>Colored days mean there is a revision, a study log, or a note waiting for you.</span><span id="lastChecked">Live check: —</span></footer>
-  </main><div class="toast" id="toast" role="status" aria-live="polite"></div><script src="app.js"></script>
+  </main><div class="toast" id="toast" role="status" aria-live="polite"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script><script src="app.js"></script>
 </body>
 </html>

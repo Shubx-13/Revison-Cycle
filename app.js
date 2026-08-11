@@ -39,10 +39,14 @@
   let toastTimer;
   let quoteMarkTaps = 0;
   let secretKeys = '';
+  let syncClient = null;
+  let syncUser = null;
+  let syncTimer = null;
+  let pullingCloud = false;
 
   function baseState() {
     return {
-      version: 4, examDate: EXAM_DATE.slice(0, 10), topics: [], calendarNotes: [], quotes: DEFAULT_QUOTES.map(quote => ({ ...quote })), quoteCursor: -1,
+      version: 5, examDate: EXAM_DATE.slice(0, 10), topics: [], calendarNotes: [], quotes: DEFAULT_QUOTES.map(quote => ({ ...quote })), quoteCursor: -1, lastChangedAt: Date.now(),
       profile: { name: '', asked: false }, settings: { email: '', notifications: false, lastAlert: '' }
     };
   }
@@ -61,12 +65,12 @@
         quotes: Array.isArray(saved.quotes) && saved.quotes.length ? saved.quotes.map(normaliseQuote).filter(Boolean) : initial.quotes,
         quoteCursor: Number.isInteger(saved.quoteCursor) ? saved.quoteCursor : -1,
         profile: { ...initial.profile, ...(saved.profile || {}) },
-        settings: { ...initial.settings, ...(saved.settings || {}) }
+        settings: { ...initial.settings, ...(saved.settings || {}) }, lastChangedAt: Number(saved.lastChangedAt) || Date.now()
       };
     } catch (_) { return baseState(); }
   }
 
-  function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  function saveState(options = {}) { if (!options.keepTimestamp) state.lastChangedAt = Date.now(); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); if (!options.skipCloud) scheduleCloudPush(); }
   function normaliseTopic(topic) {
     const completed = Array.isArray(topic.completedStages) ? topic.completedStages.filter(key => STAGES.some(stage => stage.key === key)) : [];
     return {
@@ -361,9 +365,56 @@
     const keep = { profile: state.profile, settings: state.settings };
     state = { ...baseState(), ...keep }; saveState(); showToast('Fresh start complete. Your name stayed safe. 🌱'); renderCurrentPage();
   }
-  async function copySyncMessage() {
-    const message = 'Please help me set up free sync and email reminders for my Revision Cycle app. Guide me click-by-click.';
-    try { await navigator.clipboard.writeText(message); showToast('Next-step message copied.'); } catch (_) { window.prompt('Copy this message:', message); }
+  function cloudReady() { return Boolean(syncClient && syncUser); }
+  function syncRedirectUrl() {
+    const pieces = location.pathname.split('/').filter(Boolean);
+    const base = location.hostname.endsWith('.github.io') && pieces.length ? `/${pieces[0]}/` : '/';
+    return `${location.origin}${base}`;
+  }
+  function hydrateCloudState(saved) {
+    const initial = baseState(); const source = saved || {}; const { security: _legacySecurity, ...safe } = source;
+    return { ...initial, ...safe, topics: Array.isArray(source.topics) ? source.topics.map(normaliseTopic) : [], calendarNotes: Array.isArray(source.calendarNotes) ? source.calendarNotes.map(normaliseNote) : [], quotes: Array.isArray(source.quotes) && source.quotes.length ? source.quotes.map(normaliseQuote).filter(Boolean) : initial.quotes, quoteCursor: Number.isInteger(source.quoteCursor) ? source.quoteCursor : -1, profile: { ...initial.profile, ...(source.profile || {}) }, settings: { ...initial.settings, ...(source.settings || {}) }, lastChangedAt: Number(source.lastChangedAt) || Date.now() };
+  }
+  function hasMeaningfulLocalData() { return Boolean(state.topics.length || state.calendarNotes.length || state.profile.asked || state.quotes.some(quote => !DEFAULT_QUOTES.some(defaultQuote => defaultQuote.id === quote.id))); }
+  function scheduleCloudPush() { if (!cloudReady() || pullingCloud) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => pushCloud(true), 850); }
+  async function pushCloud(silent = false) {
+    if (!cloudReady() || pullingCloud) return;
+    const snapshot = JSON.parse(JSON.stringify(state));
+    const { error } = await syncClient.from('user_dashboards').upsert({ user_id: syncUser.id, data: snapshot, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error && !silent) showToast(`Sync could not save: ${error.message}`, 'error');
+    else if (!error && !silent) showToast('Saved safely to your account.');
+    renderSetup();
+  }
+  async function syncFromCloud(silent = false) {
+    if (!cloudReady() || pullingCloud) return;
+    const { data, error } = await syncClient.from('user_dashboards').select('data, updated_at').eq('user_id', syncUser.id).maybeSingle();
+    if (error) { if (!silent) showToast(`Sync could not open: ${error.message}`, 'error'); return; }
+    if (!data) { await pushCloud(silent); return; }
+    const remoteTime = Number(data.data?.lastChangedAt) || Date.parse(data.updated_at) || 0;
+    const localTime = Number(state.lastChangedAt) || 0;
+    if (!hasMeaningfulLocalData() || remoteTime > localTime) {
+      pullingCloud = true; state = hydrateCloudState(data.data); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); pullingCloud = false;
+      renderCurrentPage(); if (!silent) showToast('Your latest revision cycle is here.');
+    } else if (localTime > remoteTime) await pushCloud(silent);
+    renderSetup();
+  }
+  async function sendMagicLink() {
+    if (!syncClient) return showToast('Sync is not ready yet. Refresh once, then try again.', 'warn');
+    const email = $('syncEmail')?.value.trim(); if (!email) return showToast('Add your email first.', 'warn');
+    const { error } = await syncClient.auth.signInWithOtp({ email, options: { emailRedirectTo: syncRedirectUrl() } });
+    if (error) return showToast(`Could not send the sign-in email: ${error.message}`, 'error');
+    state.settings.email = email; saveState({ skipCloud: true }); showToast('Email sent. Open its sign-in link on this device.');
+  }
+  async function signOutSync() { if (!syncClient) return; await syncClient.auth.signOut(); syncUser = null; renderSetup(); showToast('This device is disconnected. Your local backup remains.'); }
+  async function initCloudSync() {
+    const config = window.REVISION_CYCLE_SUPABASE;
+    if (!config?.url || !config?.publishableKey || !window.supabase?.createClient) { renderSetup(); return; }
+    syncClient = window.supabase.createClient(config.url, config.publishableKey);
+    const { data } = await syncClient.auth.getSession(); syncUser = data.session?.user || null;
+    syncClient.auth.onAuthStateChange((_event, session) => { syncUser = session?.user || null; if (syncUser) syncFromCloud(true); renderSetup(); });
+    if (syncUser) await syncFromCloud(true);
+    setInterval(() => { if (syncUser) syncFromCloud(true); }, 60000);
+    renderSetup();
   }
   function initSetup() {
     if (!$('enableNotifications')) return;
@@ -372,12 +423,17 @@
     $('exportData').addEventListener('click', () => downloadBackup('backup'));
     $('importData').addEventListener('change', restoreBackup);
     $('freshStart').addEventListener('click', freshStart);
-    $('copySyncNote').addEventListener('click', copySyncMessage);
+    $('sendMagicLink')?.addEventListener('click', sendMagicLink);
+    $('syncNow')?.addEventListener('click', () => syncFromCloud(false));
+    $('signOutSync')?.addEventListener('click', signOutSync);
     $('teaButton').addEventListener('click', () => { const lines = ['A chai break with you? I’d pretend this was accidental. ☕', 'You have the kind of focus that makes a garden want to bloom.', 'Stay a little longer—this tiny corner was hoping you would.']; $('eggMessage').textContent = lines[Math.floor(Math.random() * lines.length)]; });
   }
   function renderSetup() {
-    if ($('storageMode')) $('storageMode').textContent = 'Private local mode';
+    if ($('storageMode')) $('storageMode').textContent = cloudReady() ? 'Sync is on' : 'Private local mode';
     if ($('reminderEmail')) $('reminderEmail').value = state.settings.email || '';
+    if ($('syncEmail') && !document.activeElement?.matches('#syncEmail')) $('syncEmail').value = syncUser?.email || state.settings.email || '';
+    const syncStatus = $('syncStatus'); if (syncStatus) { syncStatus.textContent = cloudReady() ? `Connected as ${syncUser.email}` : 'Not connected yet — use your email to link this device.'; syncStatus.style.background = cloudReady() ? 'var(--green)' : 'var(--lavender)'; syncStatus.style.color = cloudReady() ? 'var(--green-ink)' : 'var(--purple)'; }
+    if ($('signOutSync')) $('signOutSync').hidden = !cloudReady();
     const status = $('notificationStatus'); if (!status) return;
     if (!('Notification' in window)) { status.textContent = 'This browser does not support browser alerts.'; status.style.background = 'var(--orange)'; status.style.color = 'var(--orange-ink)'; }
     else if (Notification.permission === 'granted') { status.textContent = 'Browser alerts are on. Nice.'; status.style.background = 'var(--green)'; status.style.color = 'var(--green-ink)'; }
@@ -441,5 +497,5 @@
   function initServiceWorker() { if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {}); }
 
   if (page === 'log') initLogEvents(); if (page === 'calendar') initCalendarEvents(); if (page === 'quotes') initQuoteEvents(); if (page === 'setup') initSetup();
-  renderCurrentPage(); rotateQuote(true); updateTime(); setInterval(updateTime, 1000); setInterval(() => rotateQuote(true), 45000); maybeAskName(); maybeNotifyDue(); initEasterEggs(); initGentleMotion(); initServiceWorker();
+  renderCurrentPage(); rotateQuote(true); updateTime(); setInterval(updateTime, 1000); setInterval(() => rotateQuote(true), 45000); maybeAskName(); maybeNotifyDue(); initEasterEggs(); initGentleMotion(); initServiceWorker(); initCloudSync();
 })();
