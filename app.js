@@ -47,7 +47,7 @@
   function baseState() {
     return {
       version: 5, examDate: EXAM_DATE.slice(0, 10), topics: [], calendarNotes: [], quotes: DEFAULT_QUOTES.map(quote => ({ ...quote })), quoteCursor: -1, lastChangedAt: Date.now(),
-      profile: { name: '', asked: false }, settings: { email: '', notifications: false, lastAlert: '' }
+      profile: { name: '', asked: false }, settings: { email: '', notifications: false, lastAlert: '', moonMode: false }
     };
   }
 
@@ -393,7 +393,7 @@
     const remoteTime = Number(data.data?.lastChangedAt) || Date.parse(data.updated_at) || 0;
     const localTime = Number(state.lastChangedAt) || 0;
     if (!hasMeaningfulLocalData() || remoteTime > localTime) {
-      pullingCloud = true; state = hydrateCloudState(data.data); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); pullingCloud = false;
+      pullingCloud = true; state = hydrateCloudState(data.data); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); document.body.classList.toggle('moon-mode', Boolean(state.settings.moonMode)); pullingCloud = false;
       renderCurrentPage(); if (!silent) showToast('Your latest revision cycle is here.');
     } else if (localTime > remoteTime) await pushCloud(silent);
     renderSetup();
@@ -472,7 +472,7 @@
       const tree = event.target.closest('.tree-card');
       if (tree) { tree.classList.remove('tree-wiggle'); requestAnimationFrame(() => tree.classList.add('tree-wiggle')); setTimeout(() => tree.classList.remove('tree-wiggle'), 1700); showToast('Easy—keep looking at me and I’ll grow leaves just for you.'); }
     });
-    document.addEventListener('keydown', event => { secretKeys = `${secretKeys}${event.key.toLowerCase()}`.slice(-10); if (secretKeys.endsWith('kabir')) { secretKeys = ''; showToast('You whispered Kabir and somehow this feels like a meet-cute.'); } if (secretKeys.endsWith('moon')) { secretKeys = ''; document.body.classList.toggle('moon-mode'); showToast('Moon mode? You really know how to set the mood.'); } });
+    document.addEventListener('keydown', event => { secretKeys = `${secretKeys}${event.key.toLowerCase()}`.slice(-10); if (secretKeys.endsWith('kabir')) { secretKeys = ''; showToast('You whispered Kabir and somehow this feels like a meet-cute.'); } if (secretKeys.endsWith('moon')) { secretKeys = ''; state.settings.moonMode = !state.settings.moonMode; document.body.classList.toggle('moon-mode', state.settings.moonMode); saveState(); showToast(state.settings.moonMode ? 'Moon mode stays with you now. Type moon again when you want daylight.' : 'Daylight is back. The moon will wait for you.'); } });
   }
 
   document.addEventListener('click', event => {
@@ -497,5 +497,5 @@
   function initServiceWorker() { if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {}); }
 
   if (page === 'log') initLogEvents(); if (page === 'calendar') initCalendarEvents(); if (page === 'quotes') initQuoteEvents(); if (page === 'setup') initSetup();
-  renderCurrentPage(); rotateQuote(true); updateTime(); setInterval(updateTime, 1000); setInterval(() => rotateQuote(true), 45000); maybeAskName(); maybeNotifyDue(); initEasterEggs(); initGentleMotion(); initServiceWorker(); initCloudSync();
+  document.body.classList.toggle('moon-mode', Boolean(state.settings.moonMode)); renderCurrentPage(); rotateQuote(true); updateTime(); setInterval(updateTime, 1000); setInterval(() => rotateQuote(true), 45000); maybeAskName(); maybeNotifyDue(); initEasterEggs(); initGentleMotion(); initServiceWorker(); initCloudSync();
 })();
