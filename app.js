@@ -148,7 +148,7 @@
 
   function rotateQuote(advance = true) {
     if (!state.quotes.length) state.quotes = DEFAULT_QUOTES.map(quote => ({ ...quote }));
-    if (advance) { state.quoteCursor = (state.quoteCursor + 1 + state.quotes.length) % state.quotes.length; saveState(); }
+    if (advance) { state.quoteCursor = (state.quoteCursor + 1 + state.quotes.length) % state.quotes.length; saveState({ keepTimestamp: true, skipCloud: true }); }
     const index = ((state.quoteCursor % state.quotes.length) + state.quotes.length) % state.quotes.length;
     const quote = state.quotes[index];
     document.querySelectorAll('[data-quote-text]').forEach(node => { node.textContent = quote.text; });
@@ -365,7 +365,9 @@
     const keep = { profile: state.profile, settings: state.settings };
     state = { ...baseState(), ...keep }; saveState(); showToast('Fresh start complete. Your name stayed safe. 🌱'); renderCurrentPage();
   }
-  function cloudReady() { return Boolean(syncClient && syncUser); }
+  function allowedSyncEmail() { return String(window.REVISION_CYCLE_SUPABASE?.allowedEmail || '').trim().toLowerCase(); }
+  function isAllowedUser(user) { return Boolean(user && user.email && user.email.toLowerCase() === allowedSyncEmail()); }
+  function cloudReady() { return Boolean(syncClient && isAllowedUser(syncUser)); }
   function syncRedirectUrl() {
     const pieces = location.pathname.split('/').filter(Boolean);
     const base = location.hostname.endsWith('.github.io') && pieces.length ? `/${pieces[0]}/` : '/';
@@ -400,8 +402,9 @@
   }
   async function sendMagicLink() {
     if (!syncClient) return showToast('Sync is not ready yet. Refresh once, then try again.', 'warn');
-    const email = $('syncEmail')?.value.trim(); if (!email) return showToast('Add your email first.', 'warn');
-    const { error } = await syncClient.auth.signInWithOtp({ email, options: { emailRedirectTo: syncRedirectUrl() } });
+    const email = $('syncEmail')?.value.trim().toLowerCase(); if (!email) return showToast('Add your email first.', 'warn');
+    if (email !== allowedSyncEmail()) return showToast('Cloud sync is private to its owner. You can still use this shared site locally.', 'warn');
+    const { error } = await syncClient.auth.signInWithOtp({ email, options: { emailRedirectTo: syncRedirectUrl(), shouldCreateUser: false } });
     if (error) return showToast(`Could not send the sign-in email: ${error.message}`, 'error');
     state.settings.email = email; saveState({ skipCloud: true }); showToast('Email sent. Open its sign-in link on this device.');
   }
@@ -410,10 +413,11 @@
     const config = window.REVISION_CYCLE_SUPABASE;
     if (!config?.url || !config?.publishableKey || !window.supabase?.createClient) { renderSetup(); return; }
     syncClient = window.supabase.createClient(config.url, config.publishableKey);
-    const { data } = await syncClient.auth.getSession(); syncUser = data.session?.user || null;
-    syncClient.auth.onAuthStateChange((_event, session) => { syncUser = session?.user || null; if (syncUser) syncFromCloud(true); renderSetup(); });
+    const { data } = await syncClient.auth.getSession(); syncUser = isAllowedUser(data.session?.user) ? data.session.user : null;
+    syncClient.auth.onAuthStateChange((_event, session) => { syncUser = isAllowedUser(session?.user) ? session.user : null; if (syncUser) syncFromCloud(true); renderSetup(); });
     if (syncUser) await syncFromCloud(true);
-    setInterval(() => { if (syncUser) syncFromCloud(true); }, 60000);
+    setInterval(() => { if (syncUser) syncFromCloud(true); }, 10000);
+    window.addEventListener('focus', () => { if (syncUser) syncFromCloud(true); });
     renderSetup();
   }
   function initSetup() {
